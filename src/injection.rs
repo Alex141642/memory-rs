@@ -53,8 +53,42 @@ impl Inject {
         trace!("Opening process {}", self.process_id);
         let process = OpenProcess(PROCESS_ALL_ACCESS , 0, self.process_id);
         trace!("Allocate memory for dll");
-        
-        todo!("Include injector");
+        let dll_address = VirtualAllocEx(
+            process,
+            std::ptr::null_mut(),
+            (path.len() * 2) + 1,
+            MEM_RESERVE | MEM_COMMIT,
+            PAGE_EXECUTE_READWRITE
+        );
+        trace!("Inject dll in process");
+        let result = WriteProcessMemory(
+            process,
+            dll_address,
+            path.as_ptr() as *mut _,
+            (path.len() *2) + 1,
+            std::ptr::null_mut()
+        );
+        if result == 0 {
+            return Err(MemoryError::InjectionError("WriteProcessMemory failed".to_string()));
+        }
+        trace!("Get LoadLibraryW function");
+        let loadlib = GetProcAddress(
+            GetModuleHandleA(CString::new("kernel32.dll")?.as_ptr()), 
+            CString::new("LoadLibraryW")?.as_ptr()
+        );
+        trace!("Create remote thread");
+        let htthread = CreateRemoteThread(
+            process,
+            std::ptr::null_mut(),
+            0,
+            Some(std::mem::transmute(loadlib)),
+            dll_address, 
+            0, 
+            std::ptr::null_mut()
+        );
+        CloseHandle(htthread);
+        trace!("Injection successful");
+        Ok(())
     }
 
     #[cfg(not(target_os = "windows"))]

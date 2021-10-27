@@ -38,3 +38,9 @@ impl From<widestring::NulError<u16>> for MemoryError {
         MemoryError::PathError("".to_string())
     }
 }
+
+impl From<std::ffi::NulError> for MemoryError {
+    fn from(_: std::ffi::NulError) -> MemoryError {
+        MemoryError::PathError("".to_string())
+    }
+}
