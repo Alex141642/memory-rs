@@ -7,7 +7,12 @@ edition = "2018"
 log = "0.4"
 hex = "0.4"
 thiserror = "1.0"
+
+# For linux injection
+nix = "0.23"
+# For windows injection
 widestring = "0.5"
+sysinfo = "0.20"
 winapi = { version = "0.3.9", features = [
     "winbase",
     "memoryapi",
@@ -15,4 +20,4 @@ winapi = { version = "0.3.9", features = [
     "libloaderapi", 
     "handleapi"
 ] }
-sysinfo = "0.20"
+

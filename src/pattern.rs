@@ -117,7 +117,7 @@ impl Pattern {
                         trace!("Address {:#04x}: checking", addr);
                         let value = match read_ptr::<u8>(addr){
                             Ok(value) => value,
-                            Err(err) => {
+                            Err(_) => {
                                 trace!("Address {:#04x}: error", addr);
                                 break;
                             }

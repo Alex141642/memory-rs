@@ -17,6 +17,12 @@ use {
     },
 };
 
+#[cfg(not(target_os = "windows"))]
+use {
+    nix::sys::signal::Signal::{SIGCONT, SIGSTOP},
+    nix::sys::signal::kill,
+};
+
 use super::Result;
 use super::MemoryError;
 
@@ -91,6 +97,7 @@ impl Inject {
         Ok(())
     }
 
+    // Concept based on https://github.com/DavidBuchanan314/dlinject/blob/master/dlinject.py
     #[cfg(not(target_os = "windows"))]
     pub fn inject(&self) -> Result<()> {
         trace!("Not implemented");
