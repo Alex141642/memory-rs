@@ -6,13 +6,6 @@ use std::mem::size_of;
 
 #[cfg(target_os = "windows")]
 use winapi::{
-    um::winbase::IsBadReadPtr,
-    um::winbase::IsBadWritePtr,
-};
-
-#[cfg(target_os = "windows")]
-use winapi::{
-    ctypes::c_void,
     um::{
         winnt::{
             PVOID,
@@ -21,11 +14,7 @@ use winapi::{
             PAGE_NOACCESS,
             PAGE_EXECUTE,
             PAGE_EXECUTE_READ,
-            PAGE_EXECUTE_READWRITE,
-            PAGE_EXECUTE_WRITECOPY,
             PAGE_READONLY,
-            PAGE_READWRITE,
-            PAGE_WRITECOPY,
         },
         memoryapi::VirtualQuery,
     },
@@ -49,19 +38,12 @@ unsafe fn can_read_ptr(address: usize) -> bool {
     if memory_info.Protect == PAGE_NOACCESS | PAGE_EXECUTE {
         return false
     }
-    /*
-    match IsBadReadPtr(address as *const c_void, size_of::<T>()){
-        0 => {
-            trace!("Allowed to read at address {:#04x}", address);
-        },
-        _ => return Err(MemoryError::ReadPtrError(address))
-    };
-    */
     return true
 }
 
 #[cfg(not(target_os = "windows"))]
 fn can_read_ptr(address: usize) -> bool {
+    // No check for linux/mac for the moment
     return true
 }
 
@@ -91,19 +73,15 @@ unsafe fn can_write_ptr(address: usize) -> bool {
     if memory_info.State != MEM_COMMIT {
         return false;
     }
-    todo!("Include checks");
-    /*
-    match IsBadWritePtr(address as *mut c_void, size_of::<T>()){
-        0 => {
-            trace!("Allowed to write to address {:#04x}", address);
-        },
-        _ => return Err(MemoryError::WritePtrError(address))
-    };
-    */
+    if memory_info.Protect == PAGE_NOACCESS | PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_READONLY {
+        return false
+    }
+    return true
 }
 
 #[cfg(not(target_os = "windows"))]
 unsafe fn can_write_ptr(address: usize) -> bool {
+    // No check for linux/mac for the moment
     return true;
 }
 
