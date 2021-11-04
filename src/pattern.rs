@@ -46,7 +46,10 @@ pub enum PatternKind {
     TriplePointer,
 }
 impl PatternKind {
-    pub fn transform(&self, address: usize, base: Option<usize>) -> Result<usize> {
+    unsafe fn get_ptr(&self, address: usize, base: usize) -> Result<usize> {
+        Ok(base + read_ptr::<usize>(address)?)
+    }
+    pub unsafe fn transform(&self, address: usize, base: Option<usize>) -> Result<usize> {
         /*
             Specify a base address when transforming data
             Useful when manipulating a data dump with pointers
@@ -59,19 +62,21 @@ impl PatternKind {
         match self {
             Address => Ok(address),
             Pointer => {
-                let address = base + read_ptr::<usize>(address)?;
-                Ok(address)
+                self.get_ptr(address, base)
             }
             DoublePointer => {
-                let mut address = base + read_ptr::<usize>(address)?;
-                address = base + read_ptr::<usize>(address)?;
-                Ok(address)
+                let mut addr = address;
+                for _ in 0..1 {
+                    addr = self.get_ptr(addr, base)?;
+                }
+                Ok(addr)
             }
             TriplePointer => {
-                let mut address = base + read_ptr::<usize>(address)?;
-                address = base + read_ptr::<usize>(address)?;
-                address = base + read_ptr::<usize>(address)?;
-                Ok(address)
+                let mut addr = address;
+                for _ in 0..2 {
+                    addr = self.get_ptr(addr, base)?;
+                }
+                Ok(addr)
             }
         }
     }
@@ -98,7 +103,7 @@ impl Pattern {
         Ok(Pattern {kind, shift, offsets})
     }
 
-    pub fn find(&self, base: Option<usize>) -> Result<usize> {
+    pub unsafe fn find(&self, base: Option<usize>) -> Result<usize> {
         use Action::*;
         trace!("Trying to find address for pattern {}", self);
         let pattern_len = self.offsets.len();
@@ -138,9 +143,10 @@ impl Pattern {
         Err(MemoryError::PatternNotFound(format!("{}", self)))
     }
 }
+
 impl std::fmt::Display for Pattern {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for action in self.clone().offsets {
+        for action in &self.offsets {
             write!(f, "{} ", action)?
         };
         Ok(())

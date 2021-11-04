@@ -4,9 +4,11 @@ use thiserror::Error;
 pub enum MemoryError {
     #[error("IO Error")]
     IoError( #[from] std::io::Error ),
-    #[error("Unable to read address {0}")]
+    #[error("Unable to execute address {0:x}")]
+    ExecPtrError(usize),
+    #[error("Unable to read address {0:x}")]
     ReadPtrError(usize),
-    #[error("Unable to write to address {0}")]
+    #[error("Unable to write to address {0:x}")]
     WritePtrError(usize),
     #[error("Unable to find path `{0}`")]
     PathError(String),
