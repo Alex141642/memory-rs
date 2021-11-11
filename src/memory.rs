@@ -1,17 +1,19 @@
 use super::MemoryError;
 use super::Result;
 use log::trace;
-use std::mem::size_of;
 use std::ptr::{read, write};
 
 #[cfg(target_os = "windows")]
-use winapi::{
-    shared::basetsd::SIZE_T,
-    um::{
-        memoryapi::VirtualQuery,
-        winnt::{
-            MEMORY_BASIC_INFORMATION, MEM_COMMIT, PAGE_EXECUTE, PAGE_EXECUTE_READ, PAGE_NOACCESS,
-            PAGE_READONLY, PAGE_READWRITE, PAGE_WRITECOPY, PVOID,
+use {
+    std::mem::size_of,
+    winapi::{
+        shared::basetsd::SIZE_T,
+        um::{
+            memoryapi::VirtualQuery,
+            winnt::{
+                MEMORY_BASIC_INFORMATION, MEM_COMMIT, PAGE_EXECUTE, PAGE_EXECUTE_READ,
+                PAGE_NOACCESS, PAGE_READONLY, PAGE_READWRITE, PAGE_WRITECOPY, PVOID,
+            },
         },
     },
 };
@@ -54,7 +56,7 @@ pub fn can_read_ptr(address: usize) -> bool {
 }
 
 #[cfg(not(target_os = "windows"))]
-pub fn can_read_ptr(address: usize) -> bool {
+pub fn can_read_ptr(_address: usize) -> bool {
     // No check for linux/mac for the moment
     return true;
 }
@@ -124,7 +126,7 @@ pub fn can_write_ptr(address: usize) -> bool {
 }
 
 #[cfg(not(target_os = "windows"))]
-unsafe fn can_write_ptr(address: usize) -> bool {
+pub unsafe fn can_write_ptr(_address: usize) -> bool {
     // No check for linux/mac for the moment
     return true;
 }
@@ -196,12 +198,15 @@ pub fn can_exec_ptr(address: usize) -> bool {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn can_exec_ptr(address: usize) -> bool {
+pub fn can_exec_ptr(_address: usize) -> bool {
     return true;
 }
 
-pub unsafe fn func_ptr<T>(address: usize) -> T {
-    std::mem::transmute_copy::<usize, T>(&address)
+pub unsafe fn func_ptr<T>(address: usize) -> Result<T> {
+    if can_exec_ptr(address) {
+        return Ok(std::mem::transmute_copy::<usize, T>(&address));
+    }
+    Err(MemoryError::ExecPtrError(address))
 }
 
 #[macro_export]
