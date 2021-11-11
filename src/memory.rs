@@ -200,11 +200,13 @@ fn can_exec_ptr(address: usize) -> bool {
     return true;
 }
 
+pub unsafe fn func_ptr<T>(address: usize) -> T {
+    std::mem::transmute_copy::<usize, T>(&address)
+}
+
 #[macro_export]
-macro_rules! make_functions {
-    ( $( $address:expr; fn $fn_name:ident( $($argument:ty),* ) -> $returntype:ty);* ;) => {
-        $(
-            $fn_name = std::mem::transmute::<*const usize, fn( $($argument),* ) -> $returntype>($address as *const usize);
-        );*
-    }
+macro_rules! make_fn {
+    ($address:expr; $returntype:ty) => {
+        unsafe { std::mem::transmute::<*const usize, $returntype>($address as *const usize) }
+    };
 }
