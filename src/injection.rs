@@ -15,11 +15,13 @@ use {
 
 use super::MemoryError;
 use super::Result;
+/*
 #[cfg(not(target_os = "windows"))]
 use {
     nix::sys::signal::kill,
     nix::sys::signal::Signal::{SIGCONT, SIGSTOP},
 };
+*/
 
 /// This structure provide 2 functions wich aims to simplify dll/so injection into process.
 ///
@@ -28,6 +30,8 @@ use {
 /// let own_inject = match Inject::new(std::process::id(), "/tmp/mylib.dll").unwrap();
 /// unsafe { own_inject.inject(); }
 /// ```
+
+#[allow(dead_code)]
 pub struct Inject {
     process_id: u32,
     library_path: PathBuf,

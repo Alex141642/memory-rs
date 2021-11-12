@@ -3,7 +3,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum MemoryError {
     #[error("IO Error")]
-    IoError( #[from] std::io::Error ),
+    IoError(#[from] std::io::Error),
     #[error("Unable to execute address {0:x}")]
     ExecPtrError(usize),
     #[error("Unable to read address {0:x}")]
@@ -12,6 +12,8 @@ pub enum MemoryError {
     WritePtrError(usize),
     #[error("Unable to find path `{0}`")]
     PathError(String),
+    #[error("Unable to patch data in memory address {0}")]
+    PatchError(usize),
     #[error("The library `{0}` has not been found")]
     LibraryNotFound(String),
     #[error("The process `{0}` given does not exist")]
@@ -33,7 +35,6 @@ impl From<hex::FromHexError> for MemoryError {
         MemoryError::PatternError(format!("{}", error))
     }
 }
-
 
 impl From<widestring::NulError<u16>> for MemoryError {
     fn from(_: widestring::NulError<u16>) -> MemoryError {
