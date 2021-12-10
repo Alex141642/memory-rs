@@ -35,7 +35,7 @@ impl Patcher {
             return Err(MemoryError::PatchError(self.address));
         }
         for i in 0..self.transformed_mem.len() {
-            write_ptr(self.address + i, self.transformed_mem[i])?;
+            write_ptr(self.address + i, self.transformed_mem[i], true)?;
         }
         Ok(())
     }
@@ -44,7 +44,7 @@ impl Patcher {
             return Err(MemoryError::PatchError(self.address));
         }
         for i in 0..self.initial_mem.len() {
-            write_ptr(self.address + i, self.initial_mem[i])?;
+            write_ptr(self.address + i, self.initial_mem[i], true)?;
         }
         Ok(())
     }

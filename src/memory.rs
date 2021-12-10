@@ -1,6 +1,6 @@
 use super::MemoryError;
 use super::Result;
-use log::trace;
+use log::{error, trace, warn};
 use std::ptr::{read, write};
 
 #[cfg(target_os = "windows")]
@@ -8,11 +8,13 @@ use {
     std::mem::size_of,
     winapi::{
         shared::basetsd::SIZE_T,
+        shared::minwindef::DWORD,
         um::{
-            memoryapi::VirtualQuery,
+            memoryapi::{VirtualProtect, VirtualQuery},
             winnt::{
                 MEMORY_BASIC_INFORMATION, MEM_COMMIT, PAGE_EXECUTE, PAGE_EXECUTE_READ,
-                PAGE_NOACCESS, PAGE_READONLY, PAGE_READWRITE, PAGE_WRITECOPY, PVOID,
+                PAGE_EXECUTE_READWRITE, PAGE_NOACCESS, PAGE_READONLY, PAGE_READWRITE,
+                PAGE_WRITECOPY, PVOID,
             },
         },
     },
@@ -112,16 +114,25 @@ pub fn can_write_ptr(address: usize) -> bool {
             &mut memory_info,
             size_of::<MEMORY_BASIC_INFORMATION>() as SIZE_T,
         );
+
         if bytes == 0 {
+            error!("Error while checking MemInfo");
             return false;
         }
         if memory_info.State != MEM_COMMIT {
+            error!("Error while checking MemInfo");
             return false;
         }
-        if memory_info.Protect == PAGE_NOACCESS | PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_READONLY {
-            return false;
-        }
-        return true;
+        match memory_info.Protect {
+            PAGE_NOACCESS | PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_READONLY => {
+                warn!("Memory do not allow write");
+                return false;
+            }
+            _ => {
+                trace!("Memory allow write");
+                return true;
+            }
+        };
     }
 }
 
@@ -150,14 +161,34 @@ pub unsafe fn can_write_ptr(_address: usize) -> bool {
 ///        };
 ///    }
 /// ```
-pub unsafe fn write_ptr<T>(address: usize, value: T) -> Result<()> {
+pub unsafe fn write_ptr<T>(address: usize, value: T, force: bool) -> Result<()> {
     trace!("Checking if address is writable");
     if !can_write_ptr(address) {
         trace!("Address is not writable");
+        if force {
+            trace!("Force writting data");
+            let mut old_protection: DWORD = 0x00;
+            VirtualProtect(
+                address as PVOID,
+                size_of::<T>(),
+                PAGE_EXECUTE_READWRITE,
+                &mut old_protection,
+            );
+            write(address as *mut T, value);
+            VirtualProtect(
+                address as PVOID,
+                size_of::<T>(),
+                old_protection,
+                &mut old_protection,
+            );
+            return Ok(());
+        }
         return Err(MemoryError::WritePtrError(address));
+    } else {
+        trace!("Address is writable");
+        write(address as *mut T, value);
     }
-    trace!("Address is writable");
-    Ok(write(address as *mut T, value))
+    Ok(())
 }
 
 /// can_exec_ptr is a function wich will check if the memory page have required configuration for exec access.

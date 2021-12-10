@@ -167,7 +167,9 @@ impl Pattern {
                 }
                 if i == pattern_len - 1 {
                     trace!("Address {:#04x}: found pattern", addr);
-                    return Ok(self.kind.transform(addr + self.shift, Some(base))?);
+                    return Ok(self
+                        .kind
+                        .transform(base + address + self.shift, Some(base))?);
                 }
                 i += 1;
             }
