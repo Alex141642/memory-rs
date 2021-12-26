@@ -167,7 +167,9 @@ pub unsafe fn write_ptr<T>(address: usize, value: T, force: bool) -> Result<()> 
         trace!("Address is not writable");
         if force {
             trace!("Force writting data");
+            #[cfg(target_os = "windows")]
             let mut old_protection: DWORD = 0x00;
+            #[cfg(target_os = "windows")]
             VirtualProtect(
                 address as PVOID,
                 size_of::<T>(),
@@ -175,6 +177,7 @@ pub unsafe fn write_ptr<T>(address: usize, value: T, force: bool) -> Result<()> 
                 &mut old_protection,
             );
             write(address as *mut T, value);
+            #[cfg(target_os = "windows")]
             VirtualProtect(
                 address as PVOID,
                 size_of::<T>(),

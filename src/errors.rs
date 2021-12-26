@@ -47,3 +47,9 @@ impl From<std::ffi::NulError> for MemoryError {
         MemoryError::PathError("".to_string())
     }
 }
+
+impl From<regex::Error> for MemoryError {
+    fn from(_: regex::Error) -> MemoryError {
+        MemoryError::PatternError("Could not build regexp".to_string())
+    }
+}

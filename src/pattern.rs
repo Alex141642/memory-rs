@@ -3,6 +3,7 @@ use super::MemoryError;
 use super::Result;
 
 use log::trace;
+use regex::bytes::Regex;
 
 /*
     Action represent an offset:
@@ -135,46 +136,38 @@ impl Pattern {
         })
     }
 
-    pub unsafe fn find(&self, base: Option<usize>) -> Result<usize> {
-        use Action::*;
+    fn build_regexp(&self) -> Result<Regex> {
+        let mut regexp = self
+            .offsets
+            .iter()
+            .map(|x| match x {
+                Action::Ignore => format!("."),
+                Action::Offset(offset) => format!("\\x{}", offset),
+            })
+            .collect::<Vec<_>>()
+            .join("");
+        regexp.insert_str(0, "(?s-u)");
+        Ok(Regex::new(&regexp)?)
+    }
+
+    pub unsafe fn find(&self, base: Option<usize>, size: Option<usize>) -> Result<usize> {
         trace!("Trying to find address for pattern {}", self);
-        let pattern_len = self.offsets.len();
         let base = match base {
             Some(base) => base,
             None => 0x400000,
         };
-        let end = base * 2 - pattern_len;
-        for address in 0..(end - base) {
-            let mut i = 0;
-            for step in self.clone().offsets {
-                let addr = base + address + i;
-                match step {
-                    Ignore => trace!("Address {:#04x}: skipping", addr),
-                    Offset(offset) => {
-                        trace!("Address {:#04x}: checking", addr);
-                        let value = match read_ptr::<u8>(addr) {
-                            Ok(value) => value,
-                            Err(_) => {
-                                trace!("Address {:#04x}: error", addr);
-                                break;
-                            }
-                        };
-                        if value != offset {
-                            trace!("Address {:#04x}: offset does not match", addr);
-                            break;
-                        }
-                    }
-                }
-                if i == pattern_len - 1 {
-                    trace!("Address {:#04x}: found pattern", addr);
-                    return Ok(self
-                        .kind
-                        .transform(base + address + self.shift, Some(base))?);
-                }
-                i += 1;
-            }
+        let size = match size {
+            Some(size) => size,
+            None => 0x400000,
+        };
+
+        let regexp = self.build_regexp()?;
+
+        let data = std::slice::from_raw_parts::<u8>(base as *const _, size);
+        match regexp.find(data) {
+            None => Err(MemoryError::PatternNotFound(format!("{}", self))),
+            Some(matches) => Ok(matches.start()),
         }
-        Err(MemoryError::PatternNotFound(format!("{}", self)))
     }
 }
 
