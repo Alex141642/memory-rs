@@ -3,6 +3,7 @@ use super::MemoryError;
 use super::Result;
 
 use log::trace;
+use log::warn;
 use regex::bytes::Regex;
 
 /*
@@ -84,14 +85,14 @@ impl PatternKind {
             Pointer => self.get_ptr(address, base),
             DoublePointer => {
                 let mut addr = address;
-                for _ in 0..1 {
+                for _ in 0..2 {
                     addr = self.get_ptr(addr, base)?;
                 }
                 Ok(addr)
             }
             TriplePointer => {
                 let mut addr = address;
-                for _ in 0..2 {
+                for _ in 0..3 {
                     addr = self.get_ptr(addr, base)?;
                 }
                 Ok(addr)
@@ -142,10 +143,11 @@ impl Pattern {
             .iter()
             .map(|x| match x {
                 Action::Ignore => format!("."),
-                Action::Offset(offset) => format!("\\x{}", offset),
+                Action::Offset(offset) => format!("\\x{:02x}", offset),
             })
             .collect::<Vec<_>>()
             .join("");
+        warn!("{}", regexp);
         regexp.insert_str(0, "(?s-u)");
         Ok(Regex::new(&regexp)?)
     }
@@ -164,10 +166,11 @@ impl Pattern {
         let regexp = self.build_regexp()?;
 
         let data = std::slice::from_raw_parts::<u8>(base as *const _, size);
-        match regexp.find(data) {
-            None => Err(MemoryError::PatternNotFound(format!("{}", self))),
-            Some(matches) => Ok(matches.start()),
-        }
+        let address = match regexp.find(data) {
+            None => return Err(MemoryError::PatternNotFound(format!("{}", self))),
+            Some(matches) => matches.start() + base,
+        };
+        self.kind.transform(address + self.shift, None)
     }
 }
 
