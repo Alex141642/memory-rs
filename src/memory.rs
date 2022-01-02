@@ -1,10 +1,11 @@
 use super::MemoryError;
 use super::Result;
-use log::{error, trace, warn};
+use log::trace;
 use std::ptr::{read, write};
 
 #[cfg(target_os = "windows")]
 use {
+    log::{error, warn},
     std::mem::size_of,
     winapi::{
         shared::basetsd::SIZE_T,
