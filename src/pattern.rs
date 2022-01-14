@@ -2,8 +2,8 @@ use super::memory::read_ptr;
 use super::MemoryError;
 use super::Result;
 
+use log::debug;
 use log::trace;
-use log::warn;
 use regex::bytes::Regex;
 
 /*
@@ -147,7 +147,7 @@ impl Pattern {
             })
             .collect::<Vec<_>>()
             .join("");
-        warn!("{}", regexp);
+        debug!("{}", regexp);
         regexp.insert_str(0, "(?s-u)");
         Ok(Regex::new(&regexp)?)
     }

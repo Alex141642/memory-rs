@@ -5,7 +5,7 @@ use std::ptr::{read, write};
 
 #[cfg(target_os = "windows")]
 use {
-    log::{error, warn},
+    log::error,
     std::mem::size_of,
     winapi::{
         shared::basetsd::SIZE_T,
@@ -126,7 +126,7 @@ pub fn can_write_ptr(address: usize) -> bool {
         }
         match memory_info.Protect {
             PAGE_NOACCESS | PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_READONLY => {
-                warn!("Memory do not allow write");
+                trace!("Memory do not allow write");
                 return false;
             }
             _ => {

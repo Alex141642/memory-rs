@@ -1,4 +1,4 @@
-use crate::memory::{can_read_ptr, can_write_ptr, read_ptr, write_ptr};
+use crate::memory::{can_read_ptr, read_ptr, write_ptr};
 use crate::{MemoryError, Result};
 pub struct Patcher {
     address: usize,
@@ -7,7 +7,7 @@ pub struct Patcher {
 }
 impl Patcher {
     pub unsafe fn new(address: usize, patch: &str) -> Result<Patcher> {
-        if !can_read_ptr(address) || !can_write_ptr(address) {
+        if !can_read_ptr(address) {
             return Err(MemoryError::WritePtrError(address));
         }
         // Define byte vectors
