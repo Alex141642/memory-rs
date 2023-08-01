@@ -19,7 +19,6 @@ enum AsmOp {
     Call = 0xE8,
     Jmp = 0xE9,
     Nop = 0x90,
-    Ret = 0xC3,
 }
 
 /// # Safety
@@ -49,28 +48,22 @@ pub unsafe fn create_trampoline(
     let pop_regs_addr = hook_call_addr + 0x5;
     let bytes_backup_addr = pop_regs_addr + 0x2;
     let back_jump_addr = bytes_backup_addr + hook_size;
-    write_ptr(push_regs_addr, AsmOp::PushAD as u8, true)?;
-    write_ptr(push_regs_addr + 0x1, AsmOp::PushFD as u8, true)?;
-    write_ptr(hook_call_addr, AsmOp::Call as u8, true)?;
-    write_ptr(
-        hook_call_addr + 0x1,
-        hook_fn_addr as isize - hook_call_addr as isize - 0x5,
-        true,
-    )?;
 
-    write_ptr(pop_regs_addr, AsmOp::PopFD as u8, true)?;
-    write_ptr(pop_regs_addr + 0x1, AsmOp::PopAD as u8, true)?;
-    for (i, byte) in backup.into_iter().enumerate() {
-        write_ptr(bytes_backup_addr + i, byte, true)?;
+    let mut bytes: Vec<u8> = Vec::with_capacity(trampoline_size);
+    bytes.push(AsmOp::PushAD as u8);
+    bytes.push(AsmOp::PushFD as u8);
+    bytes.push(AsmOp::Call as u8);
+    bytes.extend_from_slice(&(hook_fn_addr as isize - hook_call_addr as isize - 0x5).to_le_bytes());
+    bytes.push(AsmOp::PopFD as u8);
+    bytes.push(AsmOp::PopAD as u8);
+    bytes.extend_from_slice(&backup);
+    bytes.push(AsmOp::Jmp as u8);
+    bytes.extend_from_slice(
+        &((target_fn_addr + hook_size) as isize - back_jump_addr as isize - 0x5).to_le_bytes(),
+    );
+    for (i, byte) in bytes.into_iter().enumerate() {
+        write_ptr(trampoline_addr.addr() + i, byte, true)?;
     }
-
-    write_ptr(back_jump_addr, AsmOp::Jmp as u8, true)?;
-
-    write_ptr(
-        back_jump_addr + 0x1,
-        (target_fn_addr + hook_size) as isize - back_jump_addr as isize - 0x5,
-        true,
-    )?;
 
     let mut old_protection: DWORD = 0x00;
     if VirtualProtect(
@@ -117,13 +110,16 @@ pub unsafe fn hook_function(
         backup.push(read_ptr(target_fn_addr + i)?)
     }
     let trampoline_addr = create_trampoline(target_fn_addr, hook_fn_addr, backup, hook_size)?;
-    write_ptr(target_fn_addr, AsmOp::Jmp, true)?;
-    write_ptr(
-        target_fn_addr + 0x1,
-        trampoline_addr - target_fn_addr - 0x5,
-        true,
-    )?;
-    write_ptr(target_fn_addr + 0x5, AsmOp::Nop, true)?;
+    let mut bytes: Vec<u8> = Vec::new();
+    bytes.push(AsmOp::Jmp as u8);
+    bytes.extend_from_slice(
+        &(trampoline_addr as isize - target_fn_addr as isize - 0x5).to_le_bytes(),
+    );
+    bytes.push(AsmOp::Nop as u8);
+    for (i, byte) in bytes.into_iter().enumerate() {
+        write_ptr(target_fn_addr + i, byte, true)?;
+    }
+
     VirtualProtect(
         target_fn_addr as PVOID,
         hook_size,
