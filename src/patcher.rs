@@ -6,7 +6,7 @@ pub struct Patcher {
     transformed_mem: Vec<u8>,
 }
 impl Patcher {
-    pub unsafe fn new(address: usize, patch: &str) -> Result<Patcher> {
+    pub fn new(address: usize, patch: &str) -> Result<Patcher> {
         if !can_read_ptr(address) {
             return Err(MemoryError::WritePtrError(address));
         }
@@ -15,22 +15,22 @@ impl Patcher {
         let mut transformed_mem = vec![];
 
         // For each byte litteral in string, push it to transformed_mem.
-        for byte in patch.split(" ") {
+        for byte in patch.split(' ') {
             let byte = hex::decode(byte)?[0];
             transformed_mem.push(byte);
         }
 
         // For each byte in memory to replace, copy it to initial_mem.
-        for i in 0..transformed_mem.len() as usize {
+        for i in 0..transformed_mem.len() {
             initial_mem.push(read_ptr(address + i)?);
         }
-        return Ok(Patcher {
+        Ok(Patcher {
             address,
             initial_mem,
             transformed_mem,
-        });
+        })
     }
-    pub unsafe fn patch(&self) -> Result<()> {
+    pub fn patch(&self) -> Result<()> {
         if self.initial_mem.len() != self.transformed_mem.len() {
             return Err(MemoryError::PatchError(self.address));
         }
@@ -39,7 +39,7 @@ impl Patcher {
         }
         Ok(())
     }
-    pub unsafe fn restore(&self) -> Result<()> {
+    pub fn restore(&self) -> Result<()> {
         if self.initial_mem.len() != self.transformed_mem.len() {
             return Err(MemoryError::PatchError(self.address));
         }

@@ -48,13 +48,13 @@ impl Inject {
         trace!("Verify if library exist");
         let path = Path::new(library_path);
         if !path.exists() {
-            return Err(MemoryError::LibraryNotFound(format!("{}", library_path)));
+            return Err(MemoryError::LibraryNotFound(library_path.into()));
         }
         let path = path.canonicalize()?;
         trace!("Verify if process exist");
         let mut processes = System::new_all();
         processes.refresh_all();
-        if let None = processes.process(process_id as Pid) {
+        if processes.process(process_id as Pid).is_none() {
             trace!("Process has not been found");
             return Err(MemoryError::ProcessNotFound(process_id));
         }
@@ -70,48 +70,50 @@ impl Inject {
     ///
     /// It returns a `Result<Inject, MemoryError>`, because the function can fail a lot of time.
     #[cfg(target_os = "windows")]
-    pub unsafe fn inject(&self) -> Result<()> {
+    pub fn inject(&self) -> Result<()> {
         let path = self.library_path.as_os_str();
         let path = WideCString::from_os_str(path)?;
         trace!("Opening process {}", self.process_id);
-        let process = OpenProcess(PROCESS_ALL_ACCESS, 0, self.process_id);
-        trace!("Allocate memory for dll");
-        let dll_address = VirtualAllocEx(
-            process,
-            std::ptr::null_mut(),
-            (path.len() * 2) + 1,
-            MEM_RESERVE | MEM_COMMIT,
-            PAGE_EXECUTE_READWRITE,
-        );
-        trace!("Inject dll in process");
-        let result = WriteProcessMemory(
-            process,
-            dll_address,
-            path.as_ptr() as *mut _,
-            (path.len() * 2) + 1,
-            std::ptr::null_mut(),
-        );
-        if result == 0 {
-            return Err(MemoryError::InjectionError(
-                "WriteProcessMemory failed".to_string(),
-            ));
+        unsafe {
+            let process = OpenProcess(PROCESS_ALL_ACCESS, 0, self.process_id);
+            trace!("Allocate memory for dll");
+            let dll_address = VirtualAllocEx(
+                process,
+                std::ptr::null_mut(),
+                (path.len() * 2) + 1,
+                MEM_RESERVE | MEM_COMMIT,
+                PAGE_EXECUTE_READWRITE,
+            );
+            trace!("Inject dll in process");
+            let result = WriteProcessMemory(
+                process,
+                dll_address,
+                path.as_ptr() as *mut _,
+                (path.len() * 2) + 1,
+                std::ptr::null_mut(),
+            );
+            if result == 0 {
+                return Err(MemoryError::InjectionError(
+                    "WriteProcessMemory failed".to_string(),
+                ));
+            }
+            trace!("Get LoadLibraryW function");
+            let loadlib = GetProcAddress(
+                GetModuleHandleA(CString::new("kernel32.dll")?.as_ptr()),
+                CString::new("LoadLibraryW")?.as_ptr(),
+            );
+            trace!("Create remote thread");
+            let htthread = CreateRemoteThread(
+                process,
+                std::ptr::null_mut(),
+                0,
+                Some(std::mem::transmute(loadlib)),
+                dll_address,
+                0,
+                std::ptr::null_mut(),
+            );
+            CloseHandle(htthread);
         }
-        trace!("Get LoadLibraryW function");
-        let loadlib = GetProcAddress(
-            GetModuleHandleA(CString::new("kernel32.dll")?.as_ptr()),
-            CString::new("LoadLibraryW")?.as_ptr(),
-        );
-        trace!("Create remote thread");
-        let htthread = CreateRemoteThread(
-            process,
-            std::ptr::null_mut(),
-            0,
-            Some(std::mem::transmute(loadlib)),
-            dll_address,
-            0,
-            std::ptr::null_mut(),
-        );
-        CloseHandle(htthread);
         trace!("Injection successful");
         Ok(())
     }

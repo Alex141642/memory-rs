@@ -45,16 +45,13 @@ pub fn can_read_ptr(address: usize) -> bool {
             &mut memory_info,
             size_of::<MEMORY_BASIC_INFORMATION>() as SIZE_T,
         );
-        if bytes == 0 {
+        if bytes == 0
+            || memory_info.State != MEM_COMMIT
+            || memory_info.Protect == PAGE_NOACCESS | PAGE_EXECUTE
+        {
             return false;
         }
-        if memory_info.State != MEM_COMMIT {
-            return false;
-        }
-        if memory_info.Protect == PAGE_NOACCESS | PAGE_EXECUTE {
-            return false;
-        }
-        return true;
+        true
     }
 }
 
@@ -71,6 +68,7 @@ pub fn can_read_ptr(_address: usize) -> bool {
 ///
 /// By its operations, this function is unsafe.
 ///
+///
 /// Example
 /// ```rust
 /// let addr: usize = 0x400000;
@@ -81,14 +79,15 @@ pub fn can_read_ptr(_address: usize) -> bool {
 ///     };
 /// }
 /// ```
-pub unsafe fn read_ptr<T>(address: usize) -> Result<T> {
+pub fn read_ptr<T>(address: usize) -> Result<T> {
     trace!("Checking if address is readable");
     if !can_read_ptr(address) {
         trace!("Address is not readable");
         return Err(MemoryError::ReadPtrError(address));
     }
     trace!("Address is readable");
-    Ok(read(address as *const T))
+    let value = unsafe { read(address as *const T) };
+    Ok(value)
 }
 
 /// can_write_ptr is a function wich will check if the memory page have required configuration for write access.
@@ -127,13 +126,13 @@ pub fn can_write_ptr(address: usize) -> bool {
         match memory_info.Protect {
             PAGE_NOACCESS | PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_READONLY => {
                 trace!("Memory do not allow write");
-                return false;
+                false
             }
             _ => {
                 trace!("Memory allow write");
-                return true;
+                true
             }
-        };
+        }
     }
 }
 
@@ -162,7 +161,7 @@ pub unsafe fn can_write_ptr(_address: usize) -> bool {
 ///        };
 ///    }
 /// ```
-pub unsafe fn write_ptr<T>(address: usize, value: T, force: bool) -> Result<()> {
+pub fn write_ptr<T>(address: usize, value: T, force: bool) -> Result<()> {
     trace!("Checking if address is writable");
     if !can_write_ptr(address) {
         trace!("Address is not writable");
@@ -171,26 +170,28 @@ pub unsafe fn write_ptr<T>(address: usize, value: T, force: bool) -> Result<()> 
             #[cfg(target_os = "windows")]
             let mut old_protection: DWORD = 0x00;
             #[cfg(target_os = "windows")]
-            VirtualProtect(
-                address as PVOID,
-                size_of::<T>(),
-                PAGE_EXECUTE_READWRITE,
-                &mut old_protection,
-            );
-            write(address as *mut T, value);
-            #[cfg(target_os = "windows")]
-            VirtualProtect(
-                address as PVOID,
-                size_of::<T>(),
-                old_protection,
-                &mut old_protection,
-            );
+            unsafe {
+                VirtualProtect(
+                    address as PVOID,
+                    size_of::<T>(),
+                    PAGE_EXECUTE_READWRITE,
+                    &mut old_protection,
+                );
+                write(address as *mut T, value);
+                #[cfg(target_os = "windows")]
+                VirtualProtect(
+                    address as PVOID,
+                    size_of::<T>(),
+                    old_protection,
+                    &mut old_protection,
+                );
+            }
             return Ok(());
         }
         return Err(MemoryError::WritePtrError(address));
     } else {
         trace!("Address is writable");
-        write(address as *mut T, value);
+        unsafe { write(address as *mut T, value) };
     }
     Ok(())
 }
@@ -219,16 +220,14 @@ pub fn can_exec_ptr(address: usize) -> bool {
             &mut memory_info,
             size_of::<MEMORY_BASIC_INFORMATION>() as SIZE_T,
         );
-        if bytes == 0 {
+        if bytes == 0
+            || memory_info.State != MEM_COMMIT
+            || memory_info.Protect
+                == PAGE_NOACCESS | PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY
+        {
             return false;
         }
-        if memory_info.State != MEM_COMMIT {
-            return false;
-        }
-        if memory_info.Protect == PAGE_NOACCESS | PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY {
-            return false;
-        }
-        return true;
+        true
     }
 }
 
@@ -237,16 +236,9 @@ pub fn can_exec_ptr(_address: usize) -> bool {
     return true;
 }
 
-pub unsafe fn func_ptr<T>(address: usize) -> Result<T> {
-    if can_exec_ptr(address) {
-        return Ok(std::mem::transmute_copy::<usize, T>(&address));
+pub fn func_ptr<T>(address: usize) -> Result<T> {
+    match can_exec_ptr(address) {
+        true => unsafe { Ok(std::mem::transmute_copy::<usize, T>(&address)) },
+        false => Err(MemoryError::ExecPtrError(address)),
     }
-    Err(MemoryError::ExecPtrError(address))
-}
-
-#[macro_export]
-macro_rules! make_fn {
-    ($address:expr; $returntype:ty) => {
-        unsafe { std::mem::transmute::<*const usize, $returntype>($address as *const usize) }
-    };
 }

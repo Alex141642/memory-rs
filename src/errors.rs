@@ -28,6 +28,8 @@ pub enum MemoryError {
     UnknownError,
     #[error("Not implemented")]
     NotImplemented,
+    #[error("Allocation error: {0}")]
+    AllocationError(String),
 }
 
 impl From<hex::FromHexError> for MemoryError {

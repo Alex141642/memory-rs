@@ -34,7 +34,7 @@ pub enum Action {
 impl Action {
     /// from is a function wich return an enum typed Action given an str entry
     pub fn from(action: &str) -> Result<Self> {
-        trace!("Create an action from {}", action);
+        trace!("Create an action from {action}");
         use Action::*;
         let action = match action {
             "??" => Ignore,
@@ -70,15 +70,12 @@ impl PatternKind {
     unsafe fn get_ptr(&self, address: usize, base: usize) -> Result<usize> {
         Ok(base + read_ptr::<usize>(address)?)
     }
-    pub unsafe fn transform(&self, address: usize, base: Option<usize>) -> Result<usize> {
+    unsafe fn transform(&self, address: usize, base: Option<usize>) -> Result<usize> {
         /*
             Specify a base address when transforming data
             Useful when manipulating a data dump with pointers
         */
-        let base = match base {
-            Some(base) => base,
-            None => 0,
-        };
+        let base = base.unwrap_or(0);
         use PatternKind::*;
         match self {
             Address => Ok(address),
@@ -121,15 +118,11 @@ pub struct Pattern {
 impl Pattern {
     pub fn new(pattern: &str, kind: PatternKind, shift: Option<usize>) -> Result<Self> {
         trace!("Create a new pattern structure");
-        let mut offsets = Vec::new();
-        let shift = match shift {
-            Some(shift) => shift,
-            None => 0,
-        };
-        for offset in pattern.split(" ") {
-            let action = Action::from(offset)?;
-            offsets.push(action);
-        }
+        let shift = shift.unwrap_or(0);
+        let offsets: Vec<Action> = pattern
+            .split(' ')
+            .map(Action::from)
+            .collect::<Result<Vec<Action>>>()?;
         Ok(Pattern {
             kind,
             shift,
@@ -152,25 +145,17 @@ impl Pattern {
         Ok(Regex::new(&regexp)?)
     }
 
-    pub unsafe fn find(&self, base: Option<usize>, size: Option<usize>) -> Result<usize> {
+    pub fn find(&self, base: Option<usize>, size: Option<usize>) -> Result<usize> {
         trace!("Trying to find address for pattern {}", self);
-        let base = match base {
-            Some(base) => base,
-            None => 0x400000,
-        };
-        let size = match size {
-            Some(size) => size,
-            None => 0x400000,
-        };
-
+        let base = base.unwrap_or(0x400000);
+        let size = size.unwrap_or(0x400000);
         let regexp = self.build_regexp()?;
-
-        let data = std::slice::from_raw_parts::<u8>(base as *const _, size);
+        let data = unsafe { std::slice::from_raw_parts::<u8>(base as *const _, size) };
         let address = match regexp.find(data) {
             None => return Err(MemoryError::PatternNotFound(format!("{}", self))),
             Some(matches) => matches.start() + base,
         };
-        self.kind.transform(address + self.shift, None)
+        unsafe { self.kind.transform(address + self.shift, None) }
     }
 }
 
