@@ -49,12 +49,12 @@ pub unsafe fn create_trampoline(
     let pop_regs_addr = hook_call_addr + 0x5;
     let bytes_backup_addr = pop_regs_addr + 0x2;
     let back_jump_addr = bytes_backup_addr + hook_size;
-    write_ptr(pop_regs_addr, AsmOp::PushAD as u8, true)?;
-    write_ptr(pop_regs_addr + 0x1, AsmOp::PushFD as u8, true)?;
+    write_ptr(push_regs_addr, AsmOp::PushAD as u8, true)?;
+    write_ptr(push_regs_addr + 0x1, AsmOp::PushFD as u8, true)?;
     write_ptr(hook_call_addr, AsmOp::Call as u8, true)?;
     write_ptr(
         hook_call_addr + 0x1,
-        hook_fn_addr - hook_call_addr - 0x5,
+        hook_fn_addr as isize - hook_call_addr as isize - 0x5,
         true,
     )?;
 
@@ -65,9 +65,10 @@ pub unsafe fn create_trampoline(
     }
 
     write_ptr(back_jump_addr, AsmOp::Jmp as u8, true)?;
+
     write_ptr(
         back_jump_addr + 0x1,
-        target_fn_addr + hook_size - back_jump_addr - 0x5,
+        (target_fn_addr + hook_size) as isize - back_jump_addr as isize - 0x5,
         true,
     )?;
 
@@ -171,3 +172,20 @@ pub unsafe fn unhook_function(target_fn_addr: usize, hook_size: usize) -> Result
     }
     Ok(())
 }
+
+/* TODO: Example of ptr copy
+pub fn append(&mut self, other: &mut Self) {
+        unsafe {
+            self.append_elements(other.as_slice() as _);
+            other.set_len(0);
+        }
+    }
+
+unsafe fn append_elements(&mut self, other: *const [T]) {
+        let count = unsafe { (*other).len() };
+        self.reserve(count);
+        let len = self.len();
+        unsafe { ptr::copy_nonoverlapping(other as *const T, self.as_mut_ptr().add(len), count) };
+        self.len += count;
+    }
+*/
