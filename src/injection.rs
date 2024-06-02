@@ -1,6 +1,6 @@
 use log::trace;
 use std::path::{Path, PathBuf};
-use sysinfo::{Pid, System, SystemExt};
+use sysinfo::{Pid, System, };
 
 #[cfg(target_os = "windows")]
 use {
@@ -44,7 +44,7 @@ impl Inject {
     ///
     /// It returns a `Result<Inject, MemoryError>`, because the function check
     /// if the process and the lib path both exists.
-    pub fn new(process_id: i32, library_path: &str) -> Result<Self> {
+    pub fn new(process_id: u32, library_path: &str) -> Result<Self> {
         trace!("Verify if library exist");
         let path = Path::new(library_path);
         if !path.exists() {
@@ -54,7 +54,7 @@ impl Inject {
         trace!("Verify if process exist");
         let mut processes = System::new_all();
         processes.refresh_all();
-        if processes.process(process_id as Pid).is_none() {
+        if processes.process( Pid::from_u32(process_id)).is_none() {
             trace!("Process has not been found");
             return Err(MemoryError::ProcessNotFound(process_id));
         }

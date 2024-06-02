@@ -17,7 +17,7 @@ pub enum MemoryError {
     #[error("The library `{0}` has not been found")]
     LibraryNotFound(String),
     #[error("The process `{0}` given does not exist")]
-    ProcessNotFound(i32),
+    ProcessNotFound(u32),
     #[error("Could not inject `{0}`")]
     InjectionError(String),
     #[error("Could not create pattern `{0}`")]
@@ -38,8 +38,8 @@ impl From<hex::FromHexError> for MemoryError {
     }
 }
 
-impl From<widestring::NulError<u16>> for MemoryError {
-    fn from(_: widestring::NulError<u16>) -> MemoryError {
+impl From<widestring::error::ContainsNul<u16>> for MemoryError {
+    fn from(_: widestring::error::ContainsNul<u16>) -> MemoryError {
         MemoryError::PathError("".to_string())
     }
 }
