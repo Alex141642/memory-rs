@@ -48,7 +48,7 @@ impl std::fmt::Display for Action {
         use Action::*;
         match self {
             Ignore => write!(f, "??")?,
-            Offset(offset) => write!(f, "{:#04x}", offset)?,
+            Offset(offset) => write!(f, "{offset:#04x}",)?,
         };
         Ok(())
     }
@@ -135,8 +135,8 @@ impl Pattern {
             .offsets
             .iter()
             .map(|x| match x {
-                Action::Ignore => format!("."),
-                Action::Offset(offset) => format!("\\x{:02x}", offset),
+                Action::Ignore => ".".to_string(),
+                Action::Offset(offset) => format!("\\x{offset:02x}",),
             })
             .collect::<Vec<_>>()
             .join("");
@@ -152,7 +152,7 @@ impl Pattern {
         let regexp = self.build_regexp()?;
         let data = unsafe { std::slice::from_raw_parts::<u8>(base as *const _, size) };
         let address = match regexp.find(data) {
-            None => return Err(MemoryError::PatternNotFound(format!("{}", self))),
+            None => return Err(MemoryError::PatternNotFound(format!("{self}"))),
             Some(matches) => matches.start() + base,
         };
         unsafe { self.kind.transform(address + self.shift, None) }
@@ -162,7 +162,7 @@ impl Pattern {
 impl std::fmt::Display for Pattern {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for action in &self.offsets {
-            write!(f, "{} ", action)?
+            write!(f, "{action} ")?
         }
         Ok(())
     }

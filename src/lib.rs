@@ -1,6 +1,5 @@
 #![feature(const_try)]
 #![feature(const_trait_impl)]
-#![feature(strict_provenance)]
 
 mod errors;
 pub mod injection;

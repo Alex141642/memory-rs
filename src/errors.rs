@@ -34,7 +34,7 @@ pub enum MemoryError {
 
 impl From<hex::FromHexError> for MemoryError {
     fn from(error: hex::FromHexError) -> MemoryError {
-        MemoryError::PatternError(format!("{}", error))
+        MemoryError::PatternError(format!("{error}"))
     }
 }
 

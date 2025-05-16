@@ -1,6 +1,6 @@
 use log::trace;
 use std::path::{Path, PathBuf};
-use sysinfo::{Pid, System, };
+use sysinfo::{Pid, System};
 
 #[cfg(target_os = "windows")]
 use {
@@ -30,7 +30,6 @@ use {
 /// let own_inject = match Inject::new(std::process::id(), "/tmp/mylib.dll").unwrap();
 /// unsafe { own_inject.inject(); }
 /// ```
-
 #[allow(dead_code)]
 pub struct Inject {
     process_id: u32,
@@ -54,12 +53,12 @@ impl Inject {
         trace!("Verify if process exist");
         let mut processes = System::new_all();
         processes.refresh_all();
-        if processes.process( Pid::from_u32(process_id)).is_none() {
+        if processes.process(Pid::from_u32(process_id)).is_none() {
             trace!("Process has not been found");
             return Err(MemoryError::ProcessNotFound(process_id));
         }
         let inject = Inject {
-            process_id: process_id as u32,
+            process_id,
             library_path: path,
         };
         Ok(inject)
@@ -107,7 +106,10 @@ impl Inject {
                 process,
                 std::ptr::null_mut(),
                 0,
-                Some(std::mem::transmute(loadlib)),
+                Some(std::mem::transmute::<
+                    *mut winapi::shared::minwindef::__some_function,
+                    unsafe extern "system" fn(*mut winapi::ctypes::c_void) -> u32,
+                >(loadlib)),
                 dll_address,
                 0,
                 std::ptr::null_mut(),
